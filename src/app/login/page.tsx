@@ -10,6 +10,7 @@ import { useState } from "react";
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const login = useAuthStore((state) => state.login);
@@ -17,14 +18,14 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
-
+    setError("");
 
     try {
       const data = await authService.login({ email, password });
       login(data, data.token);
       router.push("/dashboard");
     } catch (error: any) {
-      console.error(error.response?.data?.message || "Login failed");
+      setError(error.response?.data?.message || "Login failed. Please check your credentials.");
     } finally {
       setIsLoading(false);
     }
@@ -42,6 +43,12 @@ export default function LoginPage() {
         <div className="bg-white/5 border border-white/10 rounded-2xl p-8 backdrop-blur-md">
           <h1 className="text-2xl font-bold mb-2">Welcome Back</h1>
           <p className="text-gray-400 mb-6">Enter your credentials to access the workspace.</p>
+          
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm mb-6">
+              {error}
+            </div>
+          )}
           
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div>
