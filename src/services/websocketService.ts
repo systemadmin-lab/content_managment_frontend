@@ -28,20 +28,20 @@ class WebSocketService {
     });
 
     this.socket.on('connect', () => {
-      console.log('✅ WebSocket Connected. Socket ID:', this.socket?.id);
+      console.log('WebSocket Connected. Socket ID:', this.socket?.id);
     });
 
     this.socket.on('connect_error', (error: Error) => {
-      console.error('❌ WebSocket Connection Error:', error.message);
+      console.error(' WebSocket Connection Error:', error.message);
     });
 
     this.socket.on('disconnect', (reason: string) => {
-      console.log('🔌 WebSocket Disconnected:', reason);
+      console.log(' WebSocket Disconnected:', reason);
     });
 
     // Listen for job completion events
     this.socket.on('job_completed', (data: JobCompletedPayload) => {
-      console.log('📬 Job Completed Event Received:', data);
+      console.log(' Job Completed Event Received:', data);
 
       // Call job-specific callback if registered
       const jobCallback = this.jobCallbacks.get(data.jobId);

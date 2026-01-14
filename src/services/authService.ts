@@ -12,7 +12,7 @@ export const authService = {
   },
 
   async getMe() {
-    const response = await api.get('/auth/me'); // Assuming /auth/me follows the pattern
+    const response = await api.get('/auth/me'); 
     return response.data;
   },
 };

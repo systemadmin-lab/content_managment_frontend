@@ -3,7 +3,7 @@
 import ConfirmModal from '@/components/ConfirmModal';
 import ContentList from '@/components/ContentList';
 import GenerationModal from '@/components/GenerationModal';
-import { contentService, GenerationJob } from '@/services/contentService';
+import { contentService, GenerationJob, SavedContent } from '@/services/contentService';
 import { wsService } from '@/services/websocketService';
 import { useAuthStore } from '@/store/useAuthStore';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -15,25 +15,11 @@ export default function DashboardPage() {
   const { user, isAuthenticated } = useAuthStore();
   const router = useRouter();
   const [jobs, setJobs] = useState<GenerationJob[]>([]);
+  const [library, setLibrary] = useState<SavedContent[]>([]);
   const [loading, setLoading] = useState(true);
   const [isGenerateOpen, setIsGenerateOpen] = useState(false);
   const [selectedJob, setSelectedJob] = useState<GenerationJob | null>(null);
   const [viewMode, setViewMode] = useState<'view' | 'edit'>('view');
-  
-  // Load saved job IDs from localStorage on mount
-  const [savedJobIds, setSavedJobIds] = useState<Set<string>>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('savedJobIds');
-      if (saved) {
-        try {
-          return new Set(JSON.parse(saved));
-        } catch (e) {
-          return new Set();
-        }
-      }
-    }
-    return new Set();
-  });
   
   // Edit state
   const [editBody, setEditBody] = useState('');
@@ -48,32 +34,69 @@ export default function DashboardPage() {
     onConfirm: () => void;
   }>({ isOpen: false, title: '', message: '', onConfirm: () => {} });
 
-  // Persist savedJobIds to localStorage whenever it changes
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('savedJobIds', JSON.stringify(Array.from(savedJobIds)));
-    }
-  }, [savedJobIds]);
+  // Match jobs with saved library content from MongoDB
+  const getContentIdForJob = (jobId: string): string | null => {
+    const job = jobs.find(j => j.jobId === jobId);
+    if (!job || !job.generatedContent) return null;
+    
+    // Find matching content in library by comparing generated content
+    const matchedContent = library.find(content => {
+      // Match by exact content body or similar title
+      return content.body === job.generatedContent || 
+             (content.title && job.prompt && content.title.includes(job.prompt.substring(0, 50)));
+    });
+    
+    return matchedContent?._id || null;
+  };
 
-  // WebSocket + Initial data fetch
+  // Merge library content into jobs to show latest edited versions
+  const getMergedJobs = (jobsArray: GenerationJob[], libraryArray: SavedContent[]): GenerationJob[] => {
+    return jobsArray.map(job => {
+      const contentId = getContentIdForJob(job.jobId);
+      if (contentId) {
+        // Find the library content for this job
+        const libraryContent = libraryArray.find(content => content._id === contentId);
+        if (libraryContent) {
+          // Merge library data into job to show latest edited version
+          return {
+            ...job,
+            prompt: libraryContent.title,
+            generatedContent: libraryContent.body,
+            contentType: libraryContent.type as GenerationJob['contentType']
+          };
+        }
+      }
+      // Return original job if not saved to library
+      return job;
+    });
+  };
+
+  // Fetch data from MongoDB
   useEffect(() => {
     if (!isAuthenticated) {
       router.push('/login');
       return;
     }
 
-    const fetchJobs = async () => {
+    const fetchData = async () => {
       try {
-        const data = await contentService.getJobs();
-        setJobs(data);
+        // Fetch both jobs and library from MongoDB
+        const [jobsData, libraryData] = await Promise.all([
+          contentService.getJobs(),
+          contentService.getLibrary()
+        ]);
+        
+        setJobs(jobsData);
+        setLibrary(libraryData);
         setLoading(false);
       } catch (error) {
-        console.error('Failed to fetch jobs:', error);
+        console.error('Failed to fetch data:', error);
+        setLoading(false);
       }
     };
 
     // Initial fetch
-    fetchJobs();
+    fetchData();
 
     // Connect WebSocket
     const token = useAuthStore.getState().token;
@@ -108,51 +131,100 @@ export default function DashboardPage() {
     };
   }, [isAuthenticated, router]);
 
+  // Auto-refresh when page becomes visible (user navigates back from library)
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [jobsData, libraryData] = await Promise.all([
+          contentService.getJobs(),
+          contentService.getLibrary()
+        ]);
+        setJobs(jobsData);
+        setLibrary(libraryData);
+      } catch (error) {
+        console.error('Failed to refresh dashboard data:', error);
+      }
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData();
+      }
+    };
+
+    const handleFocus = () => {
+      fetchData();
+    };
+
+    // Listen for page visibility changes and window focus
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
   const handleGenerate = async (prompt: string, contentType: string) => {
     try {
       const result = await contentService.createJob(prompt, contentType);
       setIsGenerateOpen(false);
       console.log('Content generation started');
-      const data = await contentService.getJobs(); // Re-fetch jobs to show the new one
-      setJobs(data);
+      // Re-fetch both jobs and library from MongoDB
+      const [jobsData, libraryData] = await Promise.all([
+        contentService.getJobs(),
+        contentService.getLibrary()
+      ]);
+      setJobs(jobsData);
+      setLibrary(libraryData);
     } catch (error) {
       console.error('Failed to start generation:', error);
     }
   };
 
   const handleDelete = async (jobId: string) => {
-    // Currently API supports deleting *content* (library), not jobs directly via DELETE /content/:id
-    // But since we are listing Jobs, and there is no documented DELETE /generate-content/:id
-    // We will assume "Delete" is deleting the local view of it or try to delete if it was saved.
-    // For this MVP, to avoid 404s on the wrong endpoint, we'll just show a "Not supported" or try to delete generically.
-    // Actually, let's try calling DELETE /content/:jobId just in case the ID is shared, 
-    // OR just remove it from the list locally to simulate deletion if the API doesn't persist jobs forever?
-    // User requirement: "Action buttons... Delete".
-    // I'll simulate it by filtering out locally and showing a toast, 
-    // UNLESS I'm sure about the API. 
-    // Safest bet: Show "Mock Delete" since API doc is ambiguous about deleting *Jobs*.
-    // Or better: Assume the list is mixing Content and Jobs? 
-    // No, `getJobs` returns Jobs.
-    // I will try to delete via `contentService.deleteContent(jobId)` which calls `/content/:id`.
-    // If it fails (404), it confirms it's not a saved content yet.
-    // I'll leave it as a "Remove from list" visual effect for now or implement if API allowed.
+    const contentId = getContentIdForJob(jobId);
     
-    // DECISION: Just toast "Deleted" and remove from state to be responsive.
-    // if (!confirm('Are you sure you want to remove this item?')) return;
-    
-    // setJobs(prev => prev.filter(j => j.jobId !== jobId));
-    // console.log('Item removed');
-    // In real app, we would call API.
-    setConfirmModal({
-      isOpen: true,
-      title: 'Delete Content',
-      message: 'Are you sure you want to remove this item? This action cannot be undone.',
-      onConfirm: () => {
-        setJobs(prev => prev.filter(j => j.jobId !== jobId));
-        console.log('Item removed');
-        setConfirmModal({ ...confirmModal, isOpen: false }); // Close modal after action
-      }
-    });
+    if (contentId) {
+      // Content is saved to library - delete from database
+      setConfirmModal({
+        isOpen: true,
+        title: 'Delete Saved Content',
+        message: 'This content is saved in your library. Delete it permanently from both dashboard and library?',
+        onConfirm: async () => {
+          try {
+            // Delete from database
+            await contentService.deleteContent(contentId);
+            
+            // Remove from local job list
+            setJobs(prev => prev.filter(j => j.jobId !== jobId));
+            
+            // Refresh library to reflect deletion
+            const libraryData = await contentService.getLibrary();
+            setLibrary(libraryData);
+            
+            console.log('Content deleted from database and library');
+          } catch (error) {
+            console.error('Failed to delete content:', error);
+          } finally {
+            setConfirmModal({ ...confirmModal, isOpen: false });
+          }
+        }
+      });
+    } else {
+      // Not saved to library - just remove from local dashboard
+      setConfirmModal({
+        isOpen: true,
+        title: 'Remove from Dashboard',
+        message: 'Remove this generation from your dashboard? (Not saved to library)',
+        onConfirm: () => {
+          setJobs(prev => prev.filter(j => j.jobId !== jobId));
+          console.log('Job removed from dashboard');
+          setConfirmModal({ ...confirmModal, isOpen: false });
+        }
+      });
+    }
   };
 
   const handleOpenView = (job: GenerationJob) => {
@@ -172,14 +244,37 @@ export default function DashboardPage() {
   const handleSaveToLibrary = async () => {
     if (!selectedJob) return;
     setIsSaving(true);
+    
     try {
-        const saved = await contentService.saveContent(selectedJob.jobId, editTitle);
-        setSavedJobIds(prev => new Set(prev).add(selectedJob.jobId));
-        console.log('Saved to Library successfully');
-        setSelectedJob(null);
+      const existingContentId = getContentIdForJob(selectedJob.jobId);
+      
+      if (existingContentId) {
+        // Update existing content in MongoDB using PUT
+        await contentService.updateContent(existingContentId, {
+          title: editTitle,
+          body: editBody,
+          type: selectedJob.contentType
+        });
+        console.log('Content updated successfully');
+      } else {
+        // Save new content to MongoDB using POST
+        await contentService.saveContent(selectedJob.jobId, editTitle);
+        console.log('Saved successfully');
+      }
+      
+      // Re-fetch both jobs and library to get updated data from MongoDB
+      // The getMergedJobs function will ensure edited content is displayed
+      const [jobsData, libraryData] = await Promise.all([
+        contentService.getJobs(),
+        contentService.getLibrary()
+      ]);
+      setJobs(jobsData);
+      setLibrary(libraryData);
+      
+      setSelectedJob(null);
     } catch (error: any) {
         console.error(error);
-        const errorMsg = error.response?.data?.message || 'Failed to save to library';
+        const errorMsg = error.response?.data?.message || 'Failed to save';
         console.error(errorMsg);
     } finally {
         setIsSaving(false);
@@ -190,7 +285,7 @@ export default function DashboardPage() {
     const completedJobs = jobs.filter(job => 
       job.status === 'completed' && 
       job.generatedContent && 
-      !savedJobIds.has(job.jobId)
+      !getContentIdForJob(job.jobId)
     );
     
     if (completedJobs.length === 0) {
@@ -207,13 +302,16 @@ export default function DashboardPage() {
         for (const job of completedJobs) {
           try {
             await contentService.saveContent(job.jobId);
-            setSavedJobIds(prev => new Set(prev).add(job.jobId));
             successCount++;
           } catch (error) {
             console.error(`Failed to save job ${job.jobId}:`, error);
           }
         }
         console.log(`Saved ${successCount}/${completedJobs.length} items to library`);
+        
+        // Re-fetch library from MongoDB after batch save
+        const libraryData = await contentService.getLibrary();
+        setLibrary(libraryData);
       }
     });
   };
@@ -221,8 +319,11 @@ export default function DashboardPage() {
   const handleSaveSingle = async (job: GenerationJob) => {
     try {
       await contentService.saveContent(job.jobId);
-      setSavedJobIds(prev => new Set(prev).add(job.jobId));
-      console.log('Saved to library successfully');
+      console.log('Saved successfully');
+      
+      // Re-fetch library from MongoDB
+      const libraryData = await contentService.getLibrary();
+      setLibrary(libraryData);
     } catch (error: any) {
       console.error('Failed to save:', error.response?.data?.message || error.message);
     }
@@ -254,11 +355,11 @@ export default function DashboardPage() {
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleSaveAllCompleted}
-              disabled={jobs.filter(j => j.status === 'completed' && !savedJobIds.has(j.jobId)).length === 0}
+              disabled={jobs.filter(j => j.status === 'completed' && !getContentIdForJob(j.jobId)).length === 0}
               className="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none ring-offset-background border border-primary text-primary hover:bg-primary/10 h-11 px-6"
             >
               <Save className="mr-2 h-4 w-4" />
-              Save All to Library
+              Save All
             </motion.button>
             <motion.button
               whileHover={{ scale: 1.05 }}
@@ -284,14 +385,14 @@ export default function DashboardPage() {
           </div>
           
           <ContentList
-            jobs={jobs}
+            jobs={getMergedJobs(jobs, library)}
             loading={loading}
             onView={handleOpenView}
             onEdit={handleOpenEdit}
             onDelete={handleDelete}
             onSave={handleSaveSingle}
             onGenerate={() => setIsGenerateOpen(true)}
-            savedJobIds={savedJobIds}
+            savedJobIds={new Set(jobs.filter(j => getContentIdForJob(j.jobId)).map(j => j.jobId))}
           />
         </motion.div>
 
@@ -365,7 +466,7 @@ export default function DashboardPage() {
                         disabled={isSaving}
                         className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
                      >
-                       {isSaving ? 'Saving...' : <><Save className="h-4 w-4" /> Save to Library</>}
+                       {isSaving ? (getContentIdForJob(selectedJob.jobId) ? 'Updating...' : 'Saving...') : <><Save className="h-4 w-4" /> {getContentIdForJob(selectedJob.jobId) ? 'Update' : 'Save'}</>}
                      </button>
                    </>
                ) : (

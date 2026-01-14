@@ -55,20 +55,20 @@ export const contentService = {
     return response.data;
   },
 
-  // Get saved content library
+ 
   getLibrary: async (search?: string) => {
     const params = search ? { search } : {};
     const response = await api.get<SavedContent[]>('/content', { params });
     return response.data;
   },
 
-  // Update saved content
+  
   updateContent: async (id: string, data: { title?: string; type?: string; body?: string }) => {
     const response = await api.put<SavedContent>(`/content/${id}`, data);
     return response.data;
   },
 
-  // Delete saved content
+  
   deleteContent: async (id: string) => {
     const response = await api.delete<{ id: string }>(`/content/${id}`);
     return response.data;

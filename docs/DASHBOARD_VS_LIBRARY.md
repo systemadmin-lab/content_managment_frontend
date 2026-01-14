@@ -240,5 +240,5 @@ Frontend → Show "✓ Saved" badge
 ---
 
 **Created:** 2026-01-12  
-**Author:** AntigravityAI Team  
+**Author:** ToveeAi Team  
 **Version:** 1.1.0

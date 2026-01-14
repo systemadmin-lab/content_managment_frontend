@@ -25,6 +25,28 @@ export default function LibraryPage() {
     fetchLibrary();
   }, []);
 
+  // Refetch library when page becomes visible (user navigates to it)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchLibrary();
+      }
+    };
+
+    const handleFocus = () => {
+      fetchLibrary();
+    };
+
+    // Listen for page visibility changes
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
+
   const fetchLibrary = async (search?: string) => {
     try {
       const data = await contentService.getLibrary(search);
@@ -96,7 +118,7 @@ export default function LibraryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <>
       <main className="container max-w-screen-2xl mx-auto px-4 md:px-8 py-8 space-y-6">
         
         {/* Header */}
@@ -318,6 +340,6 @@ export default function LibraryPage() {
         onCancel={() => setDeleteConfirm({ isOpen: false, id: '' })}
         variant="danger"
       />
-    </div>
+    </>
   );
 }

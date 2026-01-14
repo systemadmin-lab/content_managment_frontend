@@ -390,7 +390,7 @@ NEXT_PUBLIC_API_URL=https://api.antigravityai.com
 
 ## 📄 License & Credits
 
-**Project:** AntigravityAI  
+**Project:** ToveeAi  
 **Implementation Date:** 2026-01-12  
 **Technologies Used:**
 - Next.js 16.1.1

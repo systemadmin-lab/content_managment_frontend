@@ -8,7 +8,7 @@
 
 ## 📋 Overview
 
-This document provides comprehensive documentation for the newly implemented **WebSocket real-time updates** and **Content Library management features** in the AntigravityAI frontend application.
+This document provides comprehensive documentation for the newly implemented **WebSocket real-time updates** and **Content Library management features** in the ToveeAi frontend application.
 
 ### What's New
 
@@ -681,4 +681,4 @@ For questions or issues:
 
 **Document Version:** 1.0.0  
 **Last Updated:** 2026-01-12  
-**Maintained By:** AntigravityAI Team
+**Maintained By:** ToveeAi Team

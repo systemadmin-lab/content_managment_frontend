@@ -79,7 +79,7 @@ export default function Home() {
                 <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black">
                     <Brain size={16} />
                 </div>
-                <span>Antigravity<span className="text-gray-400">AI</span></span>
+                <span>ToveeAi</span>
             </div>
             
             <div className="flex items-center gap-4">
@@ -101,7 +101,7 @@ export default function Home() {
         {/* Hero Section */}
         <main ref={containerRef} className="relative pt-32 pb-20 px-6 md:px-12 lg:px-24 flex flex-col items-center justify-center min-h-[90vh]">
             
-            {/* Background Floating Elements (The "AntiGravity" Feel) */}
+            {/* Background Floating Elements (The "Floating" Feel) */}
             <div className="absolute inset-0 pointer-events-none overflow-hidden">
                 <FloatingElement delay={0} duration={8} className="absolute top-[20%] left-[10%] opacity-20">
                     <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-blue-500 to-purple-600 blur-xl" />
@@ -189,7 +189,7 @@ export default function Home() {
         {/* Footer */}
         <footer className="border-t border-white/10 py-12 bg-black/50 backdrop-blur-lg">
             <div className="container mx-auto px-6 flex flex-col md:flex-row items-center justify-between text-gray-500 text-sm">
-                <p>&copy; 2026 Antigravity AI. All rights served.</p>
+                <p>&copy; 2026 ToveeAi. All rights reserved.</p>
                 <div className="flex gap-6 mt-4 md:mt-0">
                     <Link href="#" className="hover:text-white transition-colors">Privacy</Link>
                     <Link href="#" className="hover:text-white transition-colors">Terms</Link>

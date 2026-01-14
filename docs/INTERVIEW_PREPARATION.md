@@ -1,12 +1,12 @@
-# Frontend Interview Preparation Guide - AntigravityAI
+# Frontend Interview Preparation Guide - ToveeAi
 
-This document outlines the key technical concepts, architectural decisions, and potential interview questions relevant to the **AntigravityAI** frontend application.
+This document outlines the key technical concepts, architectural decisions, and potential interview questions relevant to the **ToveeAi** frontend application.
 
 ---
 
 ## 1. Project Overview
 
-**AntigravityAI** is a modern, high-performance web application for AI content generation. It allows users to queue generation jobs (like blog outlines, product descriptions) and manages them via a real-time responsive dashboard.
+**ToveeAi** is a modern, high-performance web application for AI content generation. It allows users to queue generation jobs (like blog outlines, product descriptions) and manages them via a real-time responsive dashboard.
 
 ### Tech Stack
 *   **Framework**: [Next.js 15 (App Router)](https://nextjs.org/)
@@ -87,7 +87,7 @@ We chose **Zustand** over Redux/Context for its simplicity and performance.
 ### Q4: Explain the Auth Security.
 **A:** We store tokens in `localStorage`. While convenient, it is vulnerable to XSS. A more secure approach for production would be **HttpOnly Cookies**, which prevents JavaScript access to the token.
 
-### Q5: How did you implement the "Antigravity" floating animation?
+### Q5: How did you implement the "ToveeAi" floating animation?
 **A:** Using **Framer Motion**. We created a reusable `FloatingElement` component that animates `y` (vertical position) and `rotate` in an infinite loop with slightly randomized durations to create a natural, "floating" feel.
 
 ---
